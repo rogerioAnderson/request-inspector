@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Inspector</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #00d9ff;
+        }
+
+        .status {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .status.connected { color: #4ade80; }
+        .status.disconnected { color: #f87171; }
+
+        .info {
+            text-align: center;
+            background: #16213e;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .info code {
+            background: #0f3460;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: #00d9ff;
+        }
+
+        .requests {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .request-card {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 15px;
+            border-left: 4px solid #00d9ff;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .request-header {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .method {
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .method.GET { background: #22c55e; color: #000; }
+        .method.POST { background: #3b82f6; color: #fff; }
+        .method.PUT { background: #f59e0b; color: #000; }
+        .method.DELETE { background: #ef4444; color: #fff; }
+        .method.PATCH { background: #8b5cf6; color: #fff; }
+
+        .path {
+            font-family: monospace;
+            color: #00d9ff;
+        }
+
+        .timestamp {
+            color: #888;
+            font-size: 12px;
+            margin-left: auto;
+        }
+
+        .section {
+            margin-top: 10px;
+        }
+
+        .section-title {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 5px;
+            cursor: pointer;
+        }
+
+        .section-title:hover {
+            color: #00d9ff;
+        }
+
+        .section-content {
+            background: #0f3460;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .empty {
+            text-align: center;
+            color: #666;
+            padding: 50px;
+            font-size: 18px;
+        }
+
+        .clear-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .clear-btn:hover {
+            background: #dc2626;
+        }
+
+        .config-panel {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #0f3460;
+        }
+
+        .config-panel h2 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #00d9ff;
+        }
+
+        .config-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .form-group label {
+            font-size: 13px;
+            color: #888;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            background: #0f3460;
+            border: 1px solid #1a365d;
+            border-radius: 4px;
+            padding: 10px;
+            color: #eee;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #00d9ff;
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .config-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .save-btn {
+            background: #22c55e;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .save-btn:hover {
+            background: #16a34a;
+        }
+
+        .config-status {
+            font-size: 13px;
+            color: #888;
+        }
+
+        .config-status.success {
+            color: #4ade80;
+        }
+
+        .config-status.error {
+            color: #f87171;
+        }
+    </style>
+</head>
+<body>
+    <h1>Request Inspector</h1>
+    <p class="status disconnected" id="status">Desconectado</p>
+
+    <div class="info">
+        Envie requisicoes para: <code id="endpoint">http://localhost:8000/api/seu-endpoint</code>
+    </div>
+
+    <div class="config-panel">
+        <h2>Configurar Resposta</h2>
+        <div class="config-form">
+            <div class="form-group">
+                <label for="statusCode">Codigo HTTP</label>
+                <input type="number" id="statusCode" value="200" min="100" max="599">
+            </div>
+            <div class="form-group">
+                <label for="responsePayload">Payload de Resposta (JSON)</label>
+                <textarea id="responsePayload">{"status": "received", "message": "Requisição capturada e exibida no inspector"}</textarea>
+            </div>
+            <div class="config-actions">
+                <button class="save-btn" onclick="saveConfig()">Salvar</button>
+                <span class="config-status" id="configStatus"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="requests" id="requests">
+        <div class="empty">Aguardando requisicoes...</div>
+    </div>
+
+    <button class="clear-btn" onclick="clearRequests()">Limpar</button>
+
+    <script>
+        const requestsContainer = document.getElementById('requests');
+        const statusEl = document.getElementById('status');
+        const statusCodeInput = document.getElementById('statusCode');
+        const payloadInput = document.getElementById('responsePayload');
+        const configStatusEl = document.getElementById('configStatus');
+        let requests = [];
+
+        async function loadConfig() {
+            try {
+                const response = await fetch('/config');
+                const config = await response.json();
+                statusCodeInput.value = config.status_code;
+                payloadInput.value = config.payload;
+            } catch (error) {
+                console.error('Erro ao carregar configuracao:', error);
+            }
+        }
+
+        async function saveConfig() {
+            const statusCode = parseInt(statusCodeInput.value);
+            const payload = payloadInput.value;
+
+            try {
+                const response = await fetch('/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status_code: statusCode, payload: payload })
+                });
+
+                if (response.ok) {
+                    configStatusEl.textContent = 'Configuracao salva!';
+                    configStatusEl.className = 'config-status success';
+                } else {
+                    throw new Error('Erro ao salvar');
+                }
+            } catch (error) {
+                configStatusEl.textContent = 'Erro ao salvar configuracao';
+                configStatusEl.className = 'config-status error';
+            }
+
+            setTimeout(() => {
+                configStatusEl.textContent = '';
+                configStatusEl.className = 'config-status';
+            }, 3000);
+        }
+
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+            ws.onopen = () => {
+                statusEl.textContent = 'Conectado';
+                statusEl.className = 'status connected';
+            };
+
+            ws.onclose = () => {
+                statusEl.textContent = 'Desconectado - reconectando...';
+                statusEl.className = 'status disconnected';
+                setTimeout(connect, 2000);
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                addRequest(data);
+            };
+        }
+
+        function addRequest(data) {
+            requests.unshift(data);
+            renderRequests();
+        }
+
+        function clearRequests() {
+            requests = [];
+            renderRequests();
+        }
+
+        function formatJson(obj) {
+            if (!obj || Object.keys(obj).length === 0) return 'vazio';
+            return JSON.stringify(obj, null, 2);
+        }
+
+        function renderRequests() {
+            if (requests.length === 0) {
+                requestsContainer.innerHTML = '<div class="empty">Aguardando requisicoes...</div>';
+                return;
+            }
+
+            requestsContainer.innerHTML = requests.map((req, index) => `
+                <div class="request-card">
+                    <div class="request-header">
+                        <span class="method ${req.method}">${req.method}</span>
+                        <span class="path">${req.path}</span>
+                        <span class="timestamp">${new Date(req.timestamp).toLocaleTimeString()}</span>
+                    </div>
+
+                    ${req.query_params && Object.keys(req.query_params).length > 0 ? `
+                        <div class="section">
+                            <div class="section-title">Query Params</div>
+                            <div class="section-content">${formatJson(req.query_params)}</div>
+                        </div>
+                    ` : ''}
+
+                    ${req.body ? `
+                        <div class="section">
+                            <div class="section-title">Body</div>
+                            <div class="section-content">${typeof req.body === 'object' ? formatJson(req.body) : req.body}</div>
+                        </div>
+                    ` : ''}
+
+                    <div class="section">
+                        <div class="section-title">Headers</div>
+                        <div class="section-content">${formatJson(req.headers)}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        connect();
+        loadConfig();
+        renderRequests();
+    </script>
+</body>
+</html>
